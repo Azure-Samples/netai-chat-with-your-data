@@ -53,12 +53,16 @@ curl -fSL https://aka.ms/install-azd.sh | bash
 
 1. **Build Validation**:
    - Run `dotnet build Chat-With-Y-Data.sln` from `./src` directory
-   - Verify build succeeds with warnings (warnings are normal)
+   - Verify build succeeds with warnings (60+ warnings are normal and expected)
+   - Common warning types: nullable reference types (CS8618, CS8604), async methods (CS1998)
+   - Build should complete in 15-25 seconds
 
 2. **Individual Service Testing**:
-   - Test MarkdownBashApi: `cd ./src/ChatWYData.MarkDown.MarkitdownBashApi && dotnet run --urls http://localhost:5001`
-   - Service should start and show "Python and dependencies installed successfully"
-   - Press Ctrl+C to stop after verification
+   - Test MarkdownBashApi: `cd ./src/ChatWYData.MarkDown.MarkitdownBashApi && timeout 30 dotnet run --urls http://localhost:5001`
+   - Test MarkdownCSnakes: `cd ./src/ChatWYData.MarkDown.MarkitdownCSnakes && timeout 30 dotnet run --urls http://localhost:5002`
+   - Services should start and show "Python and dependencies installed successfully"
+   - **NOTE**: Services requiring database (DocumentsApi, VectorStore) will fail when run individually - this is expected
+   - Services must be run through AppHost orchestration for full functionality
 
 3. **Full Application Testing** (when Azure services configured):
    - Run `dotnet run` from `./src/ChatWYData.AppHost`
@@ -158,10 +162,22 @@ To use existing Azure OpenAI and Azure AI Search services:
 - Check Azure CLI authentication: `az account show`
 - Ensure required ports are available (15295, 17104, 19009, etc.)
 
+**Individual Service Failures**:
+- **Expected**: DocumentsApi, VectorStore, ChatApp, DocsMngr fail when run individually
+- **Reason**: These services require database connections and service references provided by AppHost
+- **Solution**: Always run services through `dotnet run` from AppHost directory for full functionality
+- **Testing**: Only MarkdownBashApi and MarkdownCSnakes can run standalone for validation
+
 **Python Service Issues**:
 - Services auto-install Python dependencies on Linux
-- Windows users: Python dependencies are skipped (normal behavior)
+- Windows users: Python dependencies are skipped (normal behavior)  
+- Some apt commands fail due to permissions (expected and normal)
 - Verify markitdown is available: `which markitdown`
+
+**Connection String Errors**:
+- Services like DocumentsApi require database connections
+- Connection strings are automatically provided by Aspire orchestration
+- Do not attempt to configure connection strings manually for local development
 
 ### File Locations
 
@@ -185,10 +201,11 @@ To use existing Azure OpenAI and Azure AI Search services:
 # Quick build verification
 cd ./src && dotnet build Chat-With-Y-Data.sln
 
-# Individual service test
+# Individual service tests (only for Python services)
 cd ./src/ChatWYData.MarkDown.MarkitdownBashApi && timeout 30 dotnet run --urls http://localhost:5001
+cd ./src/ChatWYData.MarkDown.MarkitdownCSnakes && timeout 30 dotnet run --urls http://localhost:5002
 
-# Full application (with Azure services)
+# Full application (with all dependencies)
 cd ./src/ChatWYData.AppHost && dotnet run
 
 # Azure deployment
@@ -203,6 +220,16 @@ az account show
 
 - **NEVER CANCEL** long-running operations (builds, deployments, service startup)
 - **ALWAYS TEST** build and basic service startup after making changes
-- **VALIDATE** that both Chat and Document Manager interfaces are functional
+- **VALIDATE** that both Chat and Document Manager interfaces are functional when fully deployed
 - **VERIFY** Python dependencies are working with individual service tests
+- **EXPECT** 60+ build warnings - these are normal and do not indicate problems
+- **UNDERSTAND** service dependencies - most services require AppHost orchestration to function
 - **SET APPROPRIATE TIMEOUTS** - builds 3+ min, deployments 45+ min, startup 15+ min
+
+## No Test Projects
+
+This repository does not contain unit test projects. Validation is done through:
+- Build verification 
+- Individual service startup testing
+- Full application deployment testing
+- Manual UI functionality testing
